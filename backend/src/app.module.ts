@@ -20,6 +20,13 @@ import { VendorModule } from './modules/vendors/vendor.module';
       database: process.env.DB_NAME,
       autoLoadEntities: true,
       synchronize: true, // Use only in development
+      ssl: true,
+
+      extra: {
+        ssl: {
+          rejectUnauthorized: false,
+        },
+      },
     }),
     OrganisationModule,
     VendorModule,
