@@ -7,6 +7,7 @@ import { VendorController } from './vendor.controller';
 import { CacService } from './cac.service';
 import { OrganisationModule } from '../organisations/organisation.module';
 import { AiExtractionService } from './ai-extraction.service';
+import { AddressVerificationService } from './address-verification.service';
 
 @Module({
   imports: [
@@ -14,6 +15,12 @@ import { AiExtractionService } from './ai-extraction.service';
     OrganisationModule, // needed so ApiKeyGuard can access OrganisationService
   ],
   controllers: [VendorController],
-  providers: [VendorService, VendorRepository, AiExtractionService, CacService],
+  providers: [
+    VendorService,
+    AddressVerificationService,
+    VendorRepository,
+    AiExtractionService,
+    CacService,
+  ],
 })
 export class VendorModule {}

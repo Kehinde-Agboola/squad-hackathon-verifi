@@ -9,6 +9,7 @@ import { VendorRepository } from './vendor.repository';
 import { CacService } from './cac.service';
 import { VerifyVendorDto } from './dto/verify-vendor.dto';
 import { VerificationStatus } from './vendor.entity';
+import { AddressVerificationService } from './address-verification.service';
 
 @Injectable()
 export class VendorService {
@@ -18,6 +19,7 @@ export class VendorService {
     private readonly vendorRepository: VendorRepository,
     private readonly cacService: CacService,
     private readonly configService: ConfigService,
+    private readonly addressVerificationService: AddressVerificationService,
   ) {}
 
   async verifyVendor(
@@ -45,6 +47,32 @@ export class VendorService {
         file.mimetype,
         dto.businessName,
       );
+
+      // After aiResult is returned with extracted address
+      let addressCheck = {
+        performed: false,
+        isValid: false,
+        confidence: 'low',
+        formattedAddress: null,
+        state: null,
+        reason: 'No address extracted from document',
+      };
+
+      if (cacResult.extractedFields.address) {
+        const addressResult =
+          await this.addressVerificationService.verifyAddress(
+            cacResult.extractedFields.address,
+          );
+
+        addressCheck = {
+          performed: true,
+          isValid: addressResult.isValid,
+          confidence: addressResult.confidence,
+          formattedAddress: addressResult.formattedAddress,
+          state: addressResult.state,
+          reason: addressResult.reason,
+        };
+      }
 
       // 3. Squad account lookup (if bank details provided)
       let bankAccountName: string | null = null;
@@ -96,6 +124,7 @@ export class VendorService {
           address: cacResult.extractedFields.address,
         },
         squadAccountLookup: squadCheck,
+        addressVerification: addressCheck,
       };
 
       // 5. Calculate final trust score
@@ -174,13 +203,29 @@ export class VendorService {
     documentScore: number,
     nameMatchScore: number,
     squadPerformed: boolean,
+    aiConfidence: number,
+    addressValid: boolean,
   ): number {
+    const addressBonus = addressValid ? 10 : 0;
+
     if (squadPerformed) {
-      // 60% CAC document, 40% bank name match
-      return Math.round(documentScore * 0.6 + nameMatchScore * 0.4);
+      // 35% doc, 25% AI, 30% name match, 10% address
+      return Math.min(
+        100,
+        Math.round(
+          documentScore * 0.35 +
+            aiConfidence * 0.25 +
+            nameMatchScore * 0.3 +
+            addressBonus,
+        ),
+      );
     }
-    // No bank check — 100% from CAC document
-    return documentScore;
+
+    // 50% doc, 40% AI, 10% address
+    return Math.min(
+      100,
+      Math.round(documentScore * 0.5 + aiConfidence * 0.4 + addressBonus),
+    );
   }
 
   // ─── Determine verdict from score + checks ────────────────────
