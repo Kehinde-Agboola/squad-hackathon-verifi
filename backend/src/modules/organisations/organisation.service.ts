@@ -17,6 +17,7 @@ import {
 } from './dto/login-organisation.dto';
 import { Organisation, OrgStatus } from './organisation.entity';
 import { SignupOrganisationDto } from './dto/organisation.dto';
+import { ref } from 'process';
 
 @Injectable()
 export class OrganisationService {
@@ -24,7 +25,7 @@ export class OrganisationService {
 
   constructor(
     private readonly orgRepository: OrganisationRepository,
-    private readonly jwtService: JwtService,
+    private readonly jwt: JwtService,
   ) {}
 
   // ─── Signup ────────────────────────────────────────────────
@@ -45,11 +46,11 @@ export class OrganisationService {
       apiKey,
     });
 
-    const token = this.signToken(org);
+    // const token = this.signToken(org);
 
     return {
+      error: false,
       message: 'Organisation registered successfully',
-      token,
       organisation: this.sanitise(org),
     };
   }
@@ -58,12 +59,12 @@ export class OrganisationService {
   async login(dto: LoginOrganisationDto) {
     const org = await this.orgRepository.findByEmail(dto.email);
     if (!org) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedException('Invalid email. Account not found');
     }
 
     const passwordMatch = await bcrypt.compare(dto.password, org.password);
     if (!passwordMatch) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedException('Invalid password. Try again.');
     }
 
     if (org.status === OrgStatus.SUSPENDED) {
@@ -72,8 +73,7 @@ export class OrganisationService {
       );
     }
 
-    const token = this.signToken(org);
-
+    const token = await this.signToken(org);
     return {
       message: 'Login successful',
       token,
@@ -125,12 +125,21 @@ export class OrganisationService {
   }
 
   // ─── Helpers ────────────────────────────────────────────────
-  private signToken(org: Organisation): string {
-    return this.jwtService.sign({
-      sub: org.id,
+  private async signToken(org: Organisation) {
+    const payload = {
+      _id: org.id,
+      name: org.name,
       email: org.email,
-      type: 'organisation',
-    });
+    };
+
+    const accessToken = await Promise.all([
+      this.jwt.signAsync(payload, {
+        secret: process.env.JWT_SECRET,
+        expiresIn: '1d',
+      }),
+    ]);
+    console.log('Generated JWT token for org:', accessToken[0]);
+    return accessToken[0];
   }
 
   private generateApiKey(): string {

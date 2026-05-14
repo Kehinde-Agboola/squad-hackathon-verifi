@@ -20,6 +20,8 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
+    "@google-cloud/vision": "^5.3.6",
+    "@google/generative-ai": "^0.24.1",
     "@nestjs/axios": "^4.0.1",
     "@nestjs/bull": "^11.0.4",
     "@nestjs/common": "^11.0.1",
@@ -31,7 +33,7 @@
     "@nestjs/swagger": "^11.4.2",
     "@nestjs/typeorm": "^11.0.1",
     "@prisma/client": "^7.8.0",
-    "axios": "^1.16.0",
+    "axios": "^1.16.1",
     "bcryptjs": "^3.0.3",
     "bull": "^4.16.5",
     "class-transformer": "^0.5.1",
