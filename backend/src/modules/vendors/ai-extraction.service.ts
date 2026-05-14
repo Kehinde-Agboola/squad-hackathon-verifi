@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 import { Injectable, Logger } from '@nestjs/common';
@@ -17,6 +19,98 @@ export class AiExtractionService {
     this.genAI = new GoogleGenerativeAI(
       this.configService.get<string>('GEMINI_API_KEY'),
     );
+  }
+
+  async extractCacFieldsWithBenchmark(
+    submittedBuffer: Buffer,
+    submittedMimeType: string,
+    benchmarkBuffer: Buffer,
+    benchmarkMimeType: string,
+    submittedBusinessName: string,
+  ): Promise<ReturnType<typeof this.extractCacFieldsFromImage>> {
+    const model = this.genAI.getGenerativeModel({
+      model: 'gemini-1.5-pro',
+    });
+
+    const prompt = `You are a document verification expert specializing in Nigerian Corporate Affairs Commission (CAC) certificates.
+
+IMAGE 1 is a VERIFIED GENUINE CAC certificate that you should use as your reference standard.
+IMAGE 2 is a document submitted for verification. The submitting business claims their name is: "${submittedBusinessName}"
+
+Compare IMAGE 2 against IMAGE 1 and analyze:
+1. Does IMAGE 2 follow the same layout and structure as IMAGE 1?
+2. Does it have the same header format, seal/stamp position, and certificate language?
+3. Does it have the same font style and document formatting?
+4. Are there any signs of tampering, editing, or inconsistency compared to the genuine document?
+
+Return ONLY a valid JSON object, no markdown, no explanation:
+{
+  "extractedBusinessName": "exact business name from IMAGE 2 or null",
+  "rcNumber": "RC number from IMAGE 2 in format RC123456 or null",
+  "registrationDate": "registration date from IMAGE 2 or null",
+  "address": "registered address from IMAGE 2 or null",
+  "directors": ["director names from IMAGE 2, empty array if none"],
+  "isCacDocument": true or false,
+  "authenticityReason": "one sentence explaining your verdict based on comparison with the genuine document",
+  "confidenceScore": number between 0 and 100,
+  "layoutMatchScore": number between 0 and 100,
+  "flags": ["specific differences or suspicious observations compared to the genuine document, empty array if none"]
+}
+
+Guidelines:
+- confidenceScore reflects how confident you are IMAGE 2 is a genuine CAC document based on comparison
+- layoutMatchScore reflects how closely IMAGE 2 matches the structure of IMAGE 1
+- flags should be specific: e.g. "Seal position differs from reference", "Header font appears different", "RC number format inconsistent"
+- Return ONLY the JSON object`;
+
+    try {
+      const result = await model.generateContent([
+        {
+          inlineData: {
+            mimeType: benchmarkMimeType as 'image/jpeg' | 'image/png',
+            data: benchmarkBuffer.toString('base64'),
+          },
+        },
+        {
+          inlineData: {
+            mimeType: submittedMimeType as 'image/jpeg' | 'image/png',
+            data: submittedBuffer.toString('base64'),
+          },
+        },
+        prompt,
+      ]);
+
+      const text = result.response.text();
+      const cleaned = text
+        .replace(/```json/g, '')
+        .replace(/```/g, '')
+        .trim();
+      const parsed = JSON.parse(cleaned);
+
+      // Blend layoutMatchScore into confidenceScore
+      if (parsed.layoutMatchScore !== undefined) {
+        parsed.confidenceScore = Math.round(
+          parsed.confidenceScore * 0.6 + parsed.layoutMatchScore * 0.4,
+        );
+      }
+
+      return parsed;
+    } catch (err) {
+      this.logger.error(
+        `Gemini benchmark comparison failed: ${(err as Error).message}`,
+      );
+      return {
+        extractedBusinessName: null,
+        rcNumber: null,
+        registrationDate: null,
+        address: null,
+        directors: [],
+        isCacDocument: false,
+        authenticityReason: 'AI benchmark comparison unavailable',
+        confidenceScore: 0,
+        flags: ['Benchmark comparison failed — manual review recommended'],
+      };
+    }
   }
 
   async extractCacFields(

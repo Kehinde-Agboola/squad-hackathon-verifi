@@ -6,6 +6,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as vision from '@google-cloud/vision';
 import { AiExtractionService } from './ai-extraction.service';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class CacService {
@@ -56,6 +58,13 @@ export class CacService {
     mimeType: string,
     submittedBusinessName: string,
   ) {
+    const benchmarkPath = path.join(
+      __dirname,
+      '../../assets/cac-benchmark.jpg',
+    );
+    const benchmarkBuffer = fs.readFileSync(benchmarkPath);
+    const benchmarkMimeType = 'image/jpeg';
+
     let aiResult: any;
 
     if (mimeType === 'application/pdf') {
@@ -68,9 +77,11 @@ export class CacService {
       );
     } else {
       // Images: send directly to Gemini — no OCR needed
-      aiResult = await this.aiExtractionService.extractCacFieldsFromImage(
+      aiResult = await this.aiExtractionService.extractCacFieldsWithBenchmark(
         fileBuffer,
         mimeType,
+        benchmarkBuffer,
+        benchmarkMimeType,
         submittedBusinessName,
       );
     }
