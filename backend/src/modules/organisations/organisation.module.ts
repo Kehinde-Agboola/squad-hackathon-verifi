@@ -9,10 +9,13 @@ import { OrganisationRepository } from './organisation.repository';
 import { OrganisationService } from './organisation.service';
 import { OrganisationController } from './organisation.controller';
 import { JwtStrategy } from '../../common/strategies/jwt.strategy';
+import { WalletService } from '../wallets/wallet.service';
+import { WalletModule } from '../wallets/wallet.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Organisation]),
+    WalletModule,
     PassportModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET,

@@ -10,6 +10,7 @@ import { CacService } from './cac.service';
 import { VerifyVendorDto } from './dto/verify-vendor.dto';
 import { VerificationStatus } from './vendor.entity';
 import { AddressVerificationService } from './address-verification.service';
+import { WalletService } from '../wallets/wallet.service';
 
 @Injectable()
 export class VendorService {
@@ -19,6 +20,7 @@ export class VendorService {
     private readonly vendorRepository: VendorRepository,
     private readonly cacService: CacService,
     private readonly configService: ConfigService,
+    private readonly walletService: WalletService,
     private readonly addressVerificationService: AddressVerificationService,
   ) {}
 
@@ -132,6 +134,8 @@ export class VendorService {
         cacResult.documentScore,
         nameMatchScore,
         squadCheck.performed,
+        cacResult.aiConfidence, // ← add this
+        addressCheck.isValid,
       );
 
       // 6. Determine verdict
@@ -156,6 +160,11 @@ export class VendorService {
         verificationChecks,
       });
 
+      await this.walletService.debitWallet(
+        organisationId,
+        10,
+        'Verification charge',
+      );
       // 8. Return result
       return {
         vendorId: vendor.id,

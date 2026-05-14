@@ -18,6 +18,7 @@ import {
 import { Organisation, OrgStatus } from './organisation.entity';
 import { SignupOrganisationDto } from './dto/organisation.dto';
 import { ref } from 'process';
+import { WalletService } from '../wallets/wallet.service';
 
 @Injectable()
 export class OrganisationService {
@@ -26,6 +27,7 @@ export class OrganisationService {
   constructor(
     private readonly orgRepository: OrganisationRepository,
     private readonly jwt: JwtService,
+    private readonly walletService: WalletService,
   ) {}
 
   // ─── Signup ────────────────────────────────────────────────
@@ -45,6 +47,8 @@ export class OrganisationService {
       password: hashedPassword,
       apiKey,
     });
+
+    await this.walletService.createWallet(org);
 
     // const token = this.signToken(org);
 
