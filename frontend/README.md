@@ -1,6 +1,6 @@
 # VendorShield Frontend
 
-AI-powered vendor verification platform for Nigeria. Complete Next.js 15 frontend with TypeScript, React Hook Form, Zustand, and Tailwind CSS.
+AI-powered vendor verification platform for Nigeria. Complete Next.js 15 frontend with TypeScript, React Hook Form, Zustand, and Tailwind CSS
 
 ## 🚀 Quick Start
 
