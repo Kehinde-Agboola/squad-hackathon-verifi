@@ -1,0 +1,156 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #FAF8F4;
+  color: #0F1A14;
+  font-family: 'DM Sans', system-ui;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Playfair Display', serif;
+  font-weight: 600;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(11, 61, 46, 0.1);
+  border-color: #1A6B52;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+
+.animate-pulse-slow {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* ─────────────────────────────────────────────────────────────
+ * Trust OS — Landing page scope
+ * Anything inside `.ts-landing` adopts the dark, design-system
+ * styling without affecting dashboard pages.
+ * ─────────────────────────────────────────────────────────── */
+.ts-landing {
+  background-color: #080C10;
+  color: #E6EDF3;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-feature-settings: 'cv11', 'ss01';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.ts-landing h1,
+.ts-landing h2,
+.ts-landing h3,
+.ts-landing h4,
+.ts-landing h5,
+.ts-landing h6 {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #E6EDF3;
+}
+
+html.ts-landing-html,
+html.ts-landing-html body {
+  background-color: #080C10;
+}
+
+/* Selection */
+.ts-landing ::selection {
+  background: rgba(0, 217, 126, 0.25);
+  color: #E6EDF3;
+}
+
+/* Scrollbar (subtle, dark) */
+.ts-landing,
+.ts-landing * {
+  scrollbar-width: thin;
+  scrollbar-color: #21262D #080C10;
+}
+.ts-landing *::-webkit-scrollbar       { width: 10px; height: 10px; }
+.ts-landing *::-webkit-scrollbar-track { background: #080C10; }
+.ts-landing *::-webkit-scrollbar-thumb { background: #21262D; border-radius: 8px; }
+.ts-landing *::-webkit-scrollbar-thumb:hover { background: #30363D; }
+
+/* Focus ring (Trust OS) */
+.ts-landing :focus-visible {
+  outline: 2px solid #00D97E;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .ts-landing *,
+  .ts-landing *::before,
+  .ts-landing *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Glow utilities */
+.ts-glow-green { box-shadow: 0 0 30px rgba(0, 217, 126, 0.18); }
+.ts-glow-amber { box-shadow: 0 0 30px rgba(240, 165, 0, 0.18); }
+.ts-glow-red   { box-shadow: 0 0 30px rgba(248, 81, 73, 0.18); }
+
+/* Subtle grid background overlay */
+.ts-grid-bg {
+  background-image:
+    linear-gradient(rgba(33, 38, 45, 0.35) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(33, 38, 45, 0.35) 1px, transparent 1px);
+  background-size: 56px 56px;
+  background-position: -1px -1px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, #000 30%, transparent 75%);
+}
+
+/* Radial green spotlight */
+.ts-spotlight {
+  background: radial-gradient(
+    ellipse 60% 50% at 50% 0%,
+    rgba(0, 217, 126, 0.10) 0%,
+    rgba(0, 217, 126, 0) 60%
+  );
+}
+
+/* Terminal cursor */
+.ts-cursor::after {
+  content: '▍';
+  color: #00D97E;
+  margin-left: 4px;
+  animation: ts-blink 1s step-end infinite;
+}
+
+/* Marquee track (duplicated content trick) */
+.ts-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: ts-marquee 35s linear infinite;
+}
+
+@keyframes ts-blink {
+  0%, 49%   { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+@keyframes ts-marquee {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
