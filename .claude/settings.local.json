@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\User\\\\projects\\\\squad-hackathon-verifi\" -Recurse)",
+      "Bash(Select-Object FullName)"
+    ]
+  }
+}
