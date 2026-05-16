@@ -28,9 +28,11 @@ export class AiExtractionService {
     benchmarkMimeType: string,
     submittedBusinessName: string,
   ): Promise<ReturnType<typeof this.extractCacFieldsFromImage>> {
+    console.log('start extracting');
     const model = this.genAI.getGenerativeModel({
-      model: 'gemini-1.5-pro',
+      model: 'gemini-2.5-flash',
     });
+    console.log('model', model);
 
     const prompt = `You are a document verification expert specializing in Nigerian Corporate Affairs Commission (CAC) certificates.
 
@@ -80,6 +82,8 @@ Guidelines:
         prompt,
       ]);
 
+      console.log('result', result);
+
       const text = result.response.text();
       const cleaned = text
         .replace(/```json/g, '')
@@ -128,7 +132,7 @@ Guidelines:
     flags: string[];
   }> {
     const model = this.genAI.getGenerativeModel({
-      model: 'gemini-1.5-pro',
+      model: 'gemini-2.5-flash',
       safetySettings: [
         {
           category: HarmCategory.HARM_CATEGORY_HARASSMENT,
@@ -199,7 +203,7 @@ Guidelines:
     submittedBusinessName: string,
   ): Promise<ReturnType<typeof this.extractCacFields>> {
     const model = this.genAI.getGenerativeModel({
-      model: 'gemini-1.5-pro',
+      model: 'gemini-2.5-flash',
     });
 
     const prompt = `You are a document verification expert specializing in Nigerian Corporate Affairs Commission (CAC) certificates.

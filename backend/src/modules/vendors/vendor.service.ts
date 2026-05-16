@@ -11,6 +11,11 @@ import { VerifyVendorDto } from './dto/verify-vendor.dto';
 import { VerificationStatus } from './vendor.entity';
 import { AddressVerificationService } from './address-verification.service';
 import { WalletService } from '../wallets/wallet.service';
+import {
+  getBankByCode,
+  NIGERIAN_BANKS,
+  searchBanksByName,
+} from 'src/common/constants/banks.constants';
 
 @Injectable()
 export class VendorService {
@@ -24,6 +29,7 @@ export class VendorService {
     private readonly addressVerificationService: AddressVerificationService,
   ) {}
 
+  // ─── Verify Vendor ────────────────────────────────────────────
   async verifyVendor(
     organisationId: string,
     dto: VerifyVendorDto,
@@ -31,41 +37,60 @@ export class VendorService {
   ) {
     if (!file) throw new BadRequestException('CAC document is required');
 
-    // 1. Create initial vendor record
+    // Resolve bank name from code upfront
+    const bank = dto.bankCode ? getBankByCode(dto.bankCode) : null;
+
+    // 1. Create initial vendor record with all submitted details
     const vendor = await this.vendorRepository.create({
       organisationId,
       businessName: dto.businessName,
+      businessType: dto.businessType,
+      businessDescription: dto.businessDescription,
+      street: dto.street,
+      city: dto.city,
+      state: dto.state,
       bankAccount: dto.bankAccount,
       bankCode: dto.bankCode,
+      bankName: bank?.name ?? null,
       contactEmail: dto.contactEmail,
       contactPhone: dto.contactPhone,
+      contactPersonName: dto.contactPersonName,
       status: VerificationStatus.PENDING,
     });
 
     try {
-      // 2. Run CAC document extraction + validation
+      // 2. Run CAC document extraction + AI validation
       const cacResult = await this.cacService.extractAndValidateCac(
         file.buffer,
         file.mimetype,
         dto.businessName,
       );
 
-      // After aiResult is returned with extracted address
+      // Guard against total AI failure
+      if (!cacResult || (!cacResult.isCacDocument && cacResult.confidenceScore === 0)) {
+        throw new BadRequestException(
+          'Could not analyse the document. Please upload a clearer image of your CAC certificate.',
+        );
+      }
+
+      // 3. Address verification — use submitted address if AI didn't extract one
+      const addressToVerify =
+        cacResult.address ??
+        [dto.street, dto.city, dto.state].filter(Boolean).join(', ') ??
+        null;
+
       let addressCheck = {
         performed: false,
         isValid: false,
         confidence: 'low',
-        formattedAddress: null,
-        state: null,
-        reason: 'No address extracted from document',
+        formattedAddress: null as string | null,
+        state: null as string | null,
+        reason: 'No address provided for verification',
       };
 
-      if (cacResult.extractedFields.address) {
+      if (addressToVerify) {
         const addressResult =
-          await this.addressVerificationService.verifyAddress(
-            cacResult.extractedFields.address,
-          );
-
+          await this.addressVerificationService.verifyAddress(addressToVerify);
         addressCheck = {
           performed: true,
           isValid: addressResult.isValid,
@@ -76,7 +101,7 @@ export class VendorService {
         };
       }
 
-      // 3. Squad account lookup (if bank details provided)
+      // 4. Squad account lookup (if bank details provided)
       let bankAccountName: string | null = null;
       let nameMatchScore = 0;
       let squadCheck = { performed: false, passed: false, reason: '' };
@@ -89,7 +114,6 @@ export class VendorService {
           );
           bankAccountName = lookupResult.account_name;
 
-          // Fuzzy match: submitted business name vs bank account name
           nameMatchScore = this.cacService.fuzzyNameMatch(
             dto.businessName,
             bankAccountName,
@@ -113,44 +137,53 @@ export class VendorService {
         }
       }
 
-      // 4. Build full verification checks summary
+      // 5. Build full verification checks summary
       const verificationChecks = {
         cacDocument: {
-          ...cacResult.documentChecks,
-          documentScore: cacResult.documentScore,
+          isCacDocument: cacResult.isCacDocument,
+          authenticityReason: cacResult.authenticityReason,
+          confidenceScore: cacResult.confidenceScore,
+          flags: cacResult.flags ?? [],
+          layoutMatchScore: cacResult.layoutMatchScore ?? null,
         },
         extractedFields: {
-          businessName: cacResult.extractedFields.businessName,
-          rcNumber: cacResult.extractedFields.rcNumber,
-          registrationDate: cacResult.extractedFields.registrationDate,
-          address: cacResult.extractedFields.address,
+          businessName: cacResult.extractedBusinessName ?? null,
+          rcNumber: cacResult.rcNumber ?? null,
+          registrationDate: cacResult.registrationDate ?? null,
+          address: cacResult.address ?? null,
+          directors: cacResult.directors ?? [],
+        },
+        submittedDetails: {
+          businessName: dto.businessName,
+          address: addressToVerify,
+          bankName: bank?.name ?? null,
+          bankAccount: dto.bankAccount ?? null,
         },
         squadAccountLookup: squadCheck,
         addressVerification: addressCheck,
       };
 
-      // 5. Calculate final trust score
+      // 6. Calculate final trust score
       const finalTrustScore = this.calculateFinalScore(
-        cacResult.documentScore,
+        cacResult.confidenceScore,
         nameMatchScore,
         squadCheck.performed,
-        cacResult.aiConfidence, // ← add this
         addressCheck.isValid,
       );
 
-      // 6. Determine verdict
+      // 7. Determine verdict
       const verdict = this.determineVerdict(
         finalTrustScore,
-        cacResult.documentChecks,
+        cacResult,
         squadCheck,
       );
 
-      // 7. Update vendor record
+      // 8. Update vendor record with results
       await this.vendorRepository.updateVerificationResult(vendor.id, {
-        extractedBusinessName: cacResult.extractedFields.businessName,
-        extractedRcNumber: cacResult.extractedFields.rcNumber,
-        extractedRegistrationDate: cacResult.extractedFields.registrationDate,
-        extractedAddress: cacResult.extractedFields.address,
+        extractedBusinessName: cacResult.extractedBusinessName,
+        extractedRcNumber: cacResult.rcNumber,
+        extractedRegistrationDate: cacResult.registrationDate,
+        extractedAddress: cacResult.address,
         bankAccountName,
         nameMatchScore,
         trustScore: finalTrustScore,
@@ -160,12 +193,14 @@ export class VendorService {
         verificationChecks,
       });
 
+      // 9. Debit wallet
       await this.walletService.debitWallet(
         organisationId,
         10,
         'Verification charge',
       );
-      // 8. Return result
+
+      // 10. Return result
       return {
         vendorId: vendor.id,
         businessName: dto.businessName,
@@ -177,7 +212,6 @@ export class VendorService {
         extractedFields: verificationChecks.extractedFields,
       };
     } catch (err) {
-      // Update vendor as failed
       await this.vendorRepository.updateVerificationResult(vendor.id, {
         status: VerificationStatus.REJECTED,
         verdict: 'REJECTED',
@@ -187,9 +221,35 @@ export class VendorService {
     }
   }
 
-  // ─── Get all vendors submitted by an org ──────────────────────
+  // ─── Get all vendors for an org ───────────────────────────────
   async getOrgVendors(organisationId: string) {
     return this.vendorRepository.findByOrgId(organisationId);
+  }
+
+  // ─── Get bank list ────────────────────────────────────────────
+  getBanks(search?: string) {
+    const banks = search ? searchBanksByName(search) : NIGERIAN_BANKS;
+    return { banks, total: banks.length };
+  }
+
+  // ─── Lookup bank account name ─────────────────────────────────
+  async lookupBankAccount(bankCode: string, accountNumber: string) {
+    const bank = getBankByCode(bankCode);
+    if (!bank) throw new BadRequestException('Invalid bank code');
+
+    try {
+      const result = await this.squadAccountLookup(bankCode, accountNumber);
+      return {
+        accountName: result.account_name,
+        accountNumber: result.account_number,
+        bankName: bank.name,
+        bankCode,
+      };
+    } catch {
+      throw new BadRequestException(
+        'Could not resolve account. Check the account number and bank code.',
+      );
+    }
   }
 
   // ─── Squad Account Lookup ─────────────────────────────────────
@@ -207,54 +267,46 @@ export class VendorService {
     return response.data.data;
   }
 
-  // ─── Final score combining CAC doc score + Squad match ────────
+  // ─── Trust Score Calculation ──────────────────────────────────
   private calculateFinalScore(
-    documentScore: number,
+    confidenceScore: number,
     nameMatchScore: number,
     squadPerformed: boolean,
-    aiConfidence: number,
     addressValid: boolean,
   ): number {
     const addressBonus = addressValid ? 10 : 0;
 
     if (squadPerformed) {
-      // 35% doc, 25% AI, 30% name match, 10% address
+      // 60% AI confidence, 30% name match, 10% address bonus
       return Math.min(
         100,
         Math.round(
-          documentScore * 0.35 +
-            aiConfidence * 0.25 +
-            nameMatchScore * 0.3 +
-            addressBonus,
+          confidenceScore * 0.6 + nameMatchScore * 0.3 + addressBonus,
         ),
       );
     }
 
-    // 50% doc, 40% AI, 10% address
-    return Math.min(
-      100,
-      Math.round(documentScore * 0.5 + aiConfidence * 0.4 + addressBonus),
-    );
+    // 90% AI confidence, 10% address bonus
+    return Math.min(100, Math.round(confidenceScore * 0.9 + addressBonus));
   }
 
-  // ─── Determine verdict from score + checks ────────────────────
+  // ─── Verdict Logic ────────────────────────────────────────────
   private determineVerdict(
     score: number,
-    docChecks: Record<string, boolean>,
+    cacResult: Record<string, any>,
     squadCheck: { performed: boolean; passed: boolean; reason: string },
   ) {
-    // Hard reject: no CAC header — not a CAC document at all
-    if (!docChecks.hasCacHeader) {
+    if (!cacResult.isCacDocument) {
       return {
         label: 'REJECTED',
         status: VerificationStatus.REJECTED,
         reason:
-          'Document does not appear to be a CAC certificate. Corporate Affairs Commission header not found.',
+          cacResult.authenticityReason ||
+          'Document does not appear to be a valid CAC certificate.',
       };
     }
 
-    // Hard reject: no RC number
-    if (!docChecks.hasRcNumber) {
+    if (!cacResult.rcNumber) {
       return {
         label: 'REJECTED',
         status: VerificationStatus.REJECTED,
@@ -262,7 +314,6 @@ export class VendorService {
       };
     }
 
-    // Hard reject: Squad check failed with low name match
     if (squadCheck.performed && !squadCheck.passed) {
       return {
         label: 'REJECTED',
@@ -283,7 +334,7 @@ export class VendorService {
       return {
         label: 'REVIEW',
         status: VerificationStatus.REVIEW,
-        reason: `Vendor requires manual review. Trust score: ${score}/100. Some checks did not pass.`,
+        reason: `Vendor requires manual review. Trust score: ${score}/100.`,
       };
     }
 

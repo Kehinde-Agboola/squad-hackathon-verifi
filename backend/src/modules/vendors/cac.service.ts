@@ -13,8 +13,9 @@ import * as path from 'path';
 export class CacService {
   private readonly logger = new Logger(CacService.name);
   private readonly client = new vision.ImageAnnotatorClient();
-  private readonly aiExtractionService: AiExtractionService;
-
+  constructor(
+    private readonly aiExtractionService: AiExtractionService, // ← inject here
+  ) {}
   // ─── Main entry point ─────────────────────────────────────────
   // async extractAndValidateCac(
   //   fileBuffer: Buffer,
@@ -59,8 +60,10 @@ export class CacService {
     submittedBusinessName: string,
   ) {
     const benchmarkPath = path.join(
-      __dirname,
-      '../../assets/cac-benchmark.jpg',
+      process.cwd(),
+      'src',
+      'assets',
+      'cac-benchmark.jpg',
     );
     const benchmarkBuffer = fs.readFileSync(benchmarkPath);
     const benchmarkMimeType = 'image/jpeg';
@@ -76,6 +79,11 @@ export class CacService {
         submittedBusinessName,
       );
     } else {
+      console.log('file buffer', fileBuffer);
+      console.log('mime Type', mimeType);
+      console.log('bench buffer', benchmarkBuffer);
+      console.log('bench mime Type', benchmarkMimeType);
+      console.log('submittedBusinessNamemodel', submittedBusinessName);
       // Images: send directly to Gemini — no OCR needed
       aiResult = await this.aiExtractionService.extractCacFieldsWithBenchmark(
         fileBuffer,
@@ -84,6 +92,8 @@ export class CacService {
         benchmarkMimeType,
         submittedBusinessName,
       );
+
+      console.log('aiResult', aiResult);
     }
 
     return aiResult;
