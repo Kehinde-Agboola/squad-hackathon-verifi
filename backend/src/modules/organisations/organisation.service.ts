@@ -142,7 +142,7 @@ export class OrganisationService {
         expiresIn: '1d',
       }),
     ]);
-    console.log('Generated JWT token for org:', accessToken[0]);
+    // console.log('Generated JWT token for org:', accessToken[0]);
     return accessToken[0];
   }
 

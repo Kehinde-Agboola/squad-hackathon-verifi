@@ -18,17 +18,34 @@ export class Vendor {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  // Which org submitted this vendor
+  // ── Organisation ───────────────────────────────────────────
   @Column()
   organisationId!: string;
 
-  // Vendor business details
+  // ── Business Info ──────────────────────────────────────────
   @Column()
   businessName!: string;
 
   @Column({ nullable: true })
+  businessType!: string;
+
+  @Column({ nullable: true })
+  businessDescription!: string;
+
+  @Column({ nullable: true })
   cacNumber!: string;
 
+  // ── Vendor Address ─────────────────────────────────────────
+  @Column({ nullable: true })
+  street!: string;
+
+  @Column({ nullable: true })
+  city!: string;
+
+  @Column({ nullable: true })
+  state!: string;
+
+  // ── Bank Details ───────────────────────────────────────────
   @Column({ nullable: true })
   bankAccount!: string;
 
@@ -36,16 +53,23 @@ export class Vendor {
   bankCode!: string;
 
   @Column({ nullable: true })
+  bankName!: string; // resolved from bankCode via constant
+
+  // ── Contact ────────────────────────────────────────────────
+  @Column({ nullable: true })
   contactEmail!: string;
 
   @Column({ nullable: true })
   contactPhone!: string;
 
-  // CAC Document
   @Column({ nullable: true })
-  cacDocumentUrl!: string; // Cloudinary URL
+  contactPersonName!: string;
 
-  // OCR Extracted Fields
+  // ── CAC Document ───────────────────────────────────────────
+  @Column({ nullable: true })
+  cacDocumentUrl!: string;
+
+  // ── OCR / AI Extracted Fields ──────────────────────────────
   @Column({ nullable: true })
   extractedBusinessName!: string;
 
@@ -58,7 +82,7 @@ export class Vendor {
   @Column({ nullable: true })
   extractedAddress!: string;
 
-  // Verification Results
+  // ── Verification Results ───────────────────────────────────
   @Column({
     type: 'enum',
     enum: VerificationStatus,
@@ -70,21 +94,20 @@ export class Vendor {
   trustScore!: number;
 
   @Column({ nullable: true })
-  verdict!: string; // VERIFIED | REJECTED | REVIEW
+  verdict!: string;
 
   @Column({ nullable: true })
   rejectionReason!: string;
 
-  // Individual check results stored as JSON
   @Column({ type: 'jsonb', nullable: true })
   verificationChecks!: Record<string, any>;
 
-  // Squad account lookup result
+  // ── Squad Account Lookup Result ────────────────────────────
   @Column({ nullable: true })
-  bankAccountName!: string; // what Squad returned
+  bankAccountName!: string;
 
   @Column({ nullable: true })
-  nameMatchScore!: number; // fuzzy match %
+  nameMatchScore!: number;
 
   @CreateDateColumn()
   createdAt!: Date;
